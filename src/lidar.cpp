@@ -219,6 +219,15 @@ int main(int argc, char** argv){
       odom.pose.pose.orientation.y = tfq2[1];
       odom.pose.pose.orientation.z = tfq2[2];
       odom.pose.pose.orientation.w = tfq2[3];
+
+      odom.pose.covariance = [
+                              0.05, 0, 0, 0, 0, 0,
+                              0, 0.05, 0, 0, 0, 0,
+                              0, 0, 0.05, 0, 0, 0,
+                              0, 0, 0, 0.05, 0, 0,
+                              0, 0, 0, 0, 0.05, 0,
+                              0, 0, 0, 0, 0, 0.05,
+                            ];
     
       pcl_loc_pub.publish(odom);
 
