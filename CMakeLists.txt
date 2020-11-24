@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   sensor_msgs
+  geometry_msgs
   tf2
   pcl_conversions
   pcl_ros
@@ -212,3 +213,7 @@ include_directories(
 add_executable(lidar_process src/lidar.cpp)
 target_link_libraries(lidar_process ${catkin_LIBRARIES})
 add_dependencies(lidar_process icp_lidar_generate_messages_cpp)
+
+add_executable(gps_and_output src/gps_update.cpp)
+target_link_libraries(gps_and_output ${catkin_LIBRARIES})
+add_dependencies(gps_and_output icp_lidar_generate_messages_cpp)
