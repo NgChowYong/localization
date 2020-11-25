@@ -67,18 +67,12 @@ void getLidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
   // convert from point cloud 2 to point cloud XYZ
   pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
 
-  // // downsample for uniform sample and store in global variable lidar_cloud
-  // pcl::VoxelGrid<pcl::PointXYZ> sor;
-  // sor.setInputCloud (temp_cloud);
-  // sor.setLeafSize (0.5f, 0.5f, 0.5f);
-  // sor.filter (*lidar_cloud);
-
   // statistical removal
   PointCloud::Ptr lidar_cloud_filter (new PointCloud);
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   sor.setInputCloud(temp_cloud);
-  sor.setMeanK(35);
-  sor.setStddevMulThresh(1.2);
+  sor.setMeanK(30);
+  sor.setStddevMulThresh(1.5);
   sor.filter(*lidar_cloud_filter);
   temp_cloud = lidar_cloud_filter;
 
@@ -98,7 +92,6 @@ void getLidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
   ne.compute(*cloud_normals);
 
   std::cout << "normal size: " << cloud_normals->size() << "\n";
-
   pcl::NormalSpaceSampling<pcl::PointXYZ, pcl::Normal> nsmp;
   nsmp.setInputCloud(temp_cloud);
   nsmp.setNormals(cloud_normals);
@@ -209,7 +202,7 @@ int main(int argc, char** argv){
       //      // do interpolation then update current lidar cloud
       //      // gradient = dx/dt
       //      // delta x = gradient * delta t
-      //      double deltat = 0.4*(curr.toNSec() - last_t.toNSec())/(last_t.toNSec() - last2_t.toNSec());
+      //      double deltat = 0.05*(curr.toNSec() - last_t.toNSec())/(last_t.toNSec() - last2_t.toNSec());
            
       //      double deltax = (last_odom.pose.pose.position.x - last2_odom.pose.pose.position.x) * deltat;
       //      double deltay = (last_odom.pose.pose.position.y - last2_odom.pose.pose.position.y) * deltat;
@@ -228,7 +221,7 @@ int main(int argc, char** argv){
                                    
       //     // compute slerp by hand
       //     tf::Quaternion rot = tfq_l.inverse()*tfq_;
-      //     rot = tfq_.slerp(tfq_*rot,0.3);
+      //     rot = tfq_.slerp(tfq_*rot,0.05);
       //     //tfq_ = tfq_ * rot;
 
       //     tf::Matrix3x3 m3temp(tfq_.inverse()*rot);
@@ -246,15 +239,6 @@ int main(int argc, char** argv){
       //     pcl::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2,mat4x4); 	
       //     //pcl_ros::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2, tftransform_);
       //     lidar_cloud_tf = lidar_cloud_tf2;
-          
-      //     // convert point cloud XYZ to point cloud 2
-      //     pcl::PCLPointCloud2::Ptr cloudFinal3 (new pcl::PCLPointCloud2 ());
-      //     pcl::toPCLPointCloud2 (*lidar_cloud_tf2,*cloudFinal3);      
-      //     cloudFinal3->header.frame_id = "velodyne";
-      //     // publish point cloud      
-      //     pcl_conversions::toPCL(ros::Time(0), cloudFinal3->header.stamp); //ros::Time::now()
-      //     pcl_inter_pub.publish(cloudFinal3);
-          
       // }
 
       // for first GPS data, do initial guesss of position
@@ -291,7 +275,7 @@ int main(int argc, char** argv){
         icp.setMaxCorrespondenceDistance (5); // unit in m
       }else{
         // for new matrix measure
-        icp.setMaxCorrespondenceDistance (0.8); // unit in m
+        icp.setMaxCorrespondenceDistance (1.1); // unit in m
       }
 
       // Set the maximum number of iterations (criterion 1)
@@ -304,13 +288,6 @@ int main(int argc, char** argv){
       // do icp for lidar to map and store in final
       icp.setInputSource(lidar_cloud_tf);
       icp.setInputTarget(cloud);
-
-      // // correspondence rejection
-      // pcl::registration::CorrespondenceRejector::Ptr rej_ptr()
-      // pcl::registration::CorrespondenceRejectorSurfaceNormal rej_normal;
-      // rej_normal.setThreshold(std::acos(deg2rad(45.0)));
-      // pcl::registration::CorrespondenceRejectorOneToOne rej_one;
-
       PointCloud Final;
       icp.align(Final, m4); // initial_guess is type of Eigen::Matrix4f
 
