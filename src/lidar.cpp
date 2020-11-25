@@ -11,6 +11,9 @@
 #include <iostream>
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_types.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/filters/normal_space.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/conversions.h>
 #include <pcl/common/transforms.h>
 #include <pcl_ros/point_cloud.h>
@@ -62,13 +65,39 @@ void getLidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
   // convert from point cloud 2 to point cloud XYZ
   pcl::fromPCLPointCloud2(pcl_pc2,*temp_cloud);
 
-  // downsample for uniform sample and store in global variable lidar_cloud
-  pcl::VoxelGrid<pcl::PointXYZ> sor;
-  sor.setInputCloud (temp_cloud);
-  sor.setLeafSize (0.5f, 0.5f, 0.5f);
-  sor.filter (*lidar_cloud);
-  get_lidar = 1;
+  // // downsample for uniform sample and store in global variable lidar_cloud
+  // pcl::VoxelGrid<pcl::PointXYZ> sor;
+  // sor.setInputCloud (temp_cloud);
+  // sor.setLeafSize (0.5f, 0.5f, 0.5f);
+  // sor.filter (*lidar_cloud);
 
+  // statistical removal
+  PointCloud::Ptr lidar_cloud_filter (new PointCloud);
+  pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
+  sor.setInputCloud(temp_cloud);
+  sor.setMeanK(50);
+  sor.setStddevMulThresh(1.0);
+  sor.filter(*lidar_cloud_filter);
+  temp_cloud = lidar_cloud_filter;
+
+  // ssample by using normal !
+  pcl::NormalEstimation<pcl::PointXYZ,pcl::Normal> ne;
+  ne.setInputCloud(temp_cloud);
+  pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
+  ne.setRadiusSearch(0.05);
+  ne.compute(*cloud_normals);
+
+  std::cout << "normal size: " << cloud_normals->size() << "\n";
+
+  pcl::NormalSpaceSampling<pcl::PointXYZ, pcl::Normal> nsmp;
+  nsmp.setInputCloud(temp_cloud);
+  nsmp.setNormals(cloud_normals);
+  nsmp.setBins(2,2,2);
+  nsmp.setSeed(0);
+  nsmp.setSample(cloud_normals->size()/2);
+  nsmp.filter(*lidar_cloud);
+
+  get_lidar = 1;
 }
 
 
@@ -163,60 +192,60 @@ int main(int argc, char** argv){
 
       // do linear interpolation of lidar scan result
       // check for first odom data and second
-      if ((last2_odom.pose.pose.position.x != 0) &&
-         (last2_odom.pose.pose.position.y != 0) &&
-         (last2_odom.pose.pose.position.z != 0) ){
-           std::cout << "do interpolation \n";
-           // do interpolation then update current lidar cloud
-           // gradient = dx/dt
-           // delta x = gradient * delta t
-           double deltat = 0.4*(curr.toNSec() - last_t.toNSec())/(last_t.toNSec() - last2_t.toNSec());
+      // if ((last2_odom.pose.pose.position.x != 0) &&
+      //    (last2_odom.pose.pose.position.y != 0) &&
+      //    (last2_odom.pose.pose.position.z != 0) ){
+      //      std::cout << "do interpolation \n";
+      //      // do interpolation then update current lidar cloud
+      //      // gradient = dx/dt
+      //      // delta x = gradient * delta t
+      //      double deltat = 0.4*(curr.toNSec() - last_t.toNSec())/(last_t.toNSec() - last2_t.toNSec());
            
-           double deltax = (last_odom.pose.pose.position.x - last2_odom.pose.pose.position.x) * deltat;
-           double deltay = (last_odom.pose.pose.position.y - last2_odom.pose.pose.position.y) * deltat;
-           double deltaz = (last_odom.pose.pose.position.z - last2_odom.pose.pose.position.z) * deltat;
+      //      double deltax = (last_odom.pose.pose.position.x - last2_odom.pose.pose.position.x) * deltat;
+      //      double deltay = (last_odom.pose.pose.position.y - last2_odom.pose.pose.position.y) * deltat;
+      //      double deltaz = (last_odom.pose.pose.position.z - last2_odom.pose.pose.position.z) * deltat;
 
-          tf::Vector3 tfv_ (deltax,deltay,deltaz);
+      //     tf::Vector3 tfv_ (deltax,deltay,deltaz);
         
-          tf::Quaternion tfq_(last_odom.pose.pose.orientation.x,
-                                last_odom.pose.pose.orientation.y,
-                                last_odom.pose.pose.orientation.z,
-                                last_odom.pose.pose.orientation.w);
-          tf::Quaternion tfq_l(last2_odom.pose.pose.orientation.x,
-                                last2_odom.pose.pose.orientation.y,
-                                last2_odom.pose.pose.orientation.z,
-                                last2_odom.pose.pose.orientation.w);
+      //     tf::Quaternion tfq_(last_odom.pose.pose.orientation.x,
+      //                           last_odom.pose.pose.orientation.y,
+      //                           last_odom.pose.pose.orientation.z,
+      //                           last_odom.pose.pose.orientation.w);
+      //     tf::Quaternion tfq_l(last2_odom.pose.pose.orientation.x,
+      //                           last2_odom.pose.pose.orientation.y,
+      //                           last2_odom.pose.pose.orientation.z,
+      //                           last2_odom.pose.pose.orientation.w);
                                    
-          // compute slerp by hand
-          tf::Quaternion rot = tfq_l.inverse()*tfq_;
-          rot = tfq_.slerp(tfq_*rot,0.3);
-          //tfq_ = tfq_ * rot;
+      //     // compute slerp by hand
+      //     tf::Quaternion rot = tfq_l.inverse()*tfq_;
+      //     rot = tfq_.slerp(tfq_*rot,0.3);
+      //     //tfq_ = tfq_ * rot;
 
-          tf::Matrix3x3 m3temp(tfq_.inverse()*rot);
-          Eigen::Matrix< double, 4, 4 > mat4x4;
-          mat4x4 << m3temp[0][0] ,m3temp[0][1] ,m3temp[0][2] ,deltax ,
-                m3temp[1][0] ,m3temp[1][1] ,m3temp[1][2] ,deltay ,
-                m3temp[2][0] ,m3temp[2][1] ,m3temp[2][2] ,deltaz ,
-                0 ,0 ,0 ,1;       
+      //     tf::Matrix3x3 m3temp(tfq_.inverse()*rot);
+      //     Eigen::Matrix< double, 4, 4 > mat4x4;
+      //     mat4x4 << m3temp[0][0] ,m3temp[0][1] ,m3temp[0][2] ,deltax ,
+      //           m3temp[1][0] ,m3temp[1][1] ,m3temp[1][2] ,deltay ,
+      //           m3temp[2][0] ,m3temp[2][1] ,m3temp[2][2] ,deltaz ,
+      //           0 ,0 ,0 ,1;       
 
-          // std::cout << tfq_[0] << "," << tfq_[1] << "," << tfq_[2] << "," << tfq_[3] <<"\n";
-          std::cout << mat4x4 <<"\n";
+      //     // std::cout << tfq_[0] << "," << tfq_[1] << "," << tfq_[2] << "," << tfq_[3] <<"\n";
+      //     std::cout << mat4x4 <<"\n";
 
-          tf::Transform tftransform_ (tfq_, tfv_);
+      //     tf::Transform tftransform_ (tfq_, tfv_);
 
-          pcl::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2,mat4x4); 	
-          //pcl_ros::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2, tftransform_);
-          lidar_cloud_tf = lidar_cloud_tf2;
+      //     pcl::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2,mat4x4); 	
+      //     //pcl_ros::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2, tftransform_);
+      //     lidar_cloud_tf = lidar_cloud_tf2;
           
-          // convert point cloud XYZ to point cloud 2
-          pcl::PCLPointCloud2::Ptr cloudFinal3 (new pcl::PCLPointCloud2 ());
-          pcl::toPCLPointCloud2 (*lidar_cloud_tf2,*cloudFinal3);      
-          cloudFinal3->header.frame_id = "velodyne";
-          // publish point cloud      
-          pcl_conversions::toPCL(ros::Time(0), cloudFinal3->header.stamp); //ros::Time::now()
-          pcl_inter_pub.publish(cloudFinal3);
+      //     // convert point cloud XYZ to point cloud 2
+      //     pcl::PCLPointCloud2::Ptr cloudFinal3 (new pcl::PCLPointCloud2 ());
+      //     pcl::toPCLPointCloud2 (*lidar_cloud_tf2,*cloudFinal3);      
+      //     cloudFinal3->header.frame_id = "velodyne";
+      //     // publish point cloud      
+      //     pcl_conversions::toPCL(ros::Time(0), cloudFinal3->header.stamp); //ros::Time::now()
+      //     pcl_inter_pub.publish(cloudFinal3);
           
-      }
+      // }
 
       // for first GPS data, do initial guesss of position
       if (first_guess == 1){
