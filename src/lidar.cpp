@@ -45,6 +45,8 @@ ros::Time last2_t;
 ros::Time last_t;
 ros::Time curr;
 
+ros::Publisher pcl_inter_pub;
+
 void getGPSCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
   // take first first gps data for initial position for icp used
@@ -75,16 +77,24 @@ void getLidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
   PointCloud::Ptr lidar_cloud_filter (new PointCloud);
   pcl::StatisticalOutlierRemoval<pcl::PointXYZ> sor;
   sor.setInputCloud(temp_cloud);
-  sor.setMeanK(50);
-  sor.setStddevMulThresh(1.0);
+  sor.setMeanK(35);
+  sor.setStddevMulThresh(1.2);
   sor.filter(*lidar_cloud_filter);
   temp_cloud = lidar_cloud_filter;
+
+  // convert point cloud XYZ to point cloud 2
+  pcl::PCLPointCloud2::Ptr cloudFinal3 (new pcl::PCLPointCloud2 ());
+  pcl::toPCLPointCloud2 (*lidar_cloud_filter,*cloudFinal3);      
+  cloudFinal3->header.frame_id = "velodyne";
+  // publish point cloud      
+  pcl_conversions::toPCL(ros::Time(0), cloudFinal3->header.stamp); //ros::Time::now()
+  pcl_inter_pub.publish(cloudFinal3);
 
   // ssample by using normal !
   pcl::NormalEstimation<pcl::PointXYZ,pcl::Normal> ne;
   ne.setInputCloud(temp_cloud);
   pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(new pcl::PointCloud<pcl::Normal>);
-  ne.setRadiusSearch(0.05);
+  ne.setRadiusSearch(0.1);
   ne.compute(*cloud_normals);
 
   std::cout << "normal size: " << cloud_normals->size() << "\n";
@@ -114,7 +124,7 @@ int main(int argc, char** argv){
   // initial publisher
   ros::Publisher pcl_map_pub = node.advertise<sensor_msgs::PointCloud2>("map", 1);
   ros::Publisher pcl_match_pub = node.advertise<sensor_msgs::PointCloud2>("match", 1);
-  ros::Publisher pcl_inter_pub = node.advertise<sensor_msgs::PointCloud2>("interpolate", 1);
+  pcl_inter_pub = node.advertise<sensor_msgs::PointCloud2>("interpolate", 1);
   ros::Publisher pcl_loc_pub = node.advertise<nav_msgs::Odometry>("lidar_odom", 1);
   ros::Rate rate(0.5);
 
@@ -281,19 +291,26 @@ int main(int argc, char** argv){
         icp.setMaxCorrespondenceDistance (5); // unit in m
       }else{
         // for new matrix measure
-        icp.setMaxCorrespondenceDistance (2); // unit in m
+        icp.setMaxCorrespondenceDistance (0.8); // unit in m
       }
 
       // Set the maximum number of iterations (criterion 1)
-      icp.setMaximumIterations (1000);
+      icp.setMaximumIterations (2000);
       // Set the transformation epsilon (criterion 2) -> diff between previoud and current is smaller than a value
-      icp.setTransformationEpsilon (1e-8); // 1e-8 // closeness to converge
+      icp.setTransformationEpsilon (5e-9); // 1e-8 // closeness to converge
       // Set the euclidean distance difference epsilon (criterion 3) -> sum of Euclidean squared errors is smaller than a user defined threshold
-      icp.setEuclideanFitnessEpsilon (0.01);
+      icp.setEuclideanFitnessEpsilon (0.008);
 
       // do icp for lidar to map and store in final
       icp.setInputSource(lidar_cloud_tf);
       icp.setInputTarget(cloud);
+
+      // // correspondence rejection
+      // pcl::registration::CorrespondenceRejector::Ptr rej_ptr()
+      // pcl::registration::CorrespondenceRejectorSurfaceNormal rej_normal;
+      // rej_normal.setThreshold(std::acos(deg2rad(45.0)));
+      // pcl::registration::CorrespondenceRejectorOneToOne rej_one;
+
       PointCloud Final;
       icp.align(Final, m4); // initial_guess is type of Eigen::Matrix4f
 
