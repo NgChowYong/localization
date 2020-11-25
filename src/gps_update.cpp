@@ -17,6 +17,8 @@ ros::Publisher gps_pub;
 ros::Publisher imu_pub;
 int count = 1;
 
+std::string filename = "/home/icmems/Desktop/SDC/catkin_ws/test.csv";
+
 void getGPSCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
     gps_data = *msg;
@@ -51,7 +53,7 @@ void getLidarCallback(const nav_msgs::Odometry::ConstPtr& msg)
     mat.getRPY(r, p, y);
 
     std::ofstream myfile;
-    myfile.open("test.csv",std::ofstream::app);
+    myfile.open(filename,std::ofstream::app);
     // id x y z yaw pitch roll
     myfile << count << "," 
            << li_odom.pose.pose.position.x << ","  
@@ -67,7 +69,7 @@ void getLidarCallback(const nav_msgs::Odometry::ConstPtr& msg)
 
 int main(int argc, char** argv){
     std::ofstream myfile;
-    myfile.open("test.csv",std::ofstream::out);
+    myfile.open(filename,std::ofstream::out);
     // id x y z yaw pitch roll
     myfile << "ID" << "," 
             << "x" << ","  

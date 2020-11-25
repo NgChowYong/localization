@@ -1,6 +1,6 @@
 <launch>
-    <node pkg="icp_lidar" type="gps_and_output" name="output" clear_params="true" />
-    <node pkg="icp_lidar" type="lidar_process" name="lidar_icp" clear_params="true" />
+    <node pkg="icp_lidar" type="gps_and_output" name="output" clear_params="true"  output="screen"/>
+    <node pkg="icp_lidar" type="lidar_process" name="lidar_icp" clear_params="true" output="screen"/>
     <!-- <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="true">
     <rosparam command="load" file="$(find icp_lidar)/launch/ekf_template.yaml" />
   </node> -->

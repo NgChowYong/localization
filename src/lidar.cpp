@@ -33,6 +33,15 @@ int first_guess = 0;
 double initial_angle = 2.37; // in rad // by trial and error
 int get_lidar = 0;
 
+// for interpolation to compenstate time delay error
+// need 2 data to interpolate third data
+nav_msgs::Odometry last2_odom;
+nav_msgs::Odometry last_odom;
+nav_msgs::Odometry interpolate_odom;
+ros::Time last2_t;
+ros::Time last_t;
+ros::Time curr;
+
 void getGPSCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
 {
   // take first first gps data for initial position for icp used
@@ -44,6 +53,8 @@ void getGPSCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
 
 void getLidarCallback(const sensor_msgs::PointCloud2::ConstPtr& msg)
 {   
+  curr = msg->header.stamp;
+
   pcl::PCLPointCloud2 pcl_pc2;    
   PointCloud::Ptr temp_cloud(new PointCloud);
   // convert message to point cloud 2
@@ -74,6 +85,7 @@ int main(int argc, char** argv){
   // initial publisher
   ros::Publisher pcl_map_pub = node.advertise<sensor_msgs::PointCloud2>("map", 1);
   ros::Publisher pcl_match_pub = node.advertise<sensor_msgs::PointCloud2>("match", 1);
+  ros::Publisher pcl_inter_pub = node.advertise<sensor_msgs::PointCloud2>("interpolate", 1);
   ros::Publisher pcl_loc_pub = node.advertise<nav_msgs::Odometry>("lidar_odom", 1);
   ros::Rate rate(0.5);
 
@@ -146,7 +158,65 @@ int main(int argc, char** argv){
       
       // store lidar cloud (down sampled) in lidar cloud tf
       PointCloud::Ptr lidar_cloud_tf (new PointCloud);  
+      PointCloud::Ptr lidar_cloud_tf2 (new PointCloud);  
       lidar_cloud_tf = lidar_cloud;
+
+      // do linear interpolation of lidar scan result
+      // check for first odom data and second
+      if ((last2_odom.pose.pose.position.x != 0) &&
+         (last2_odom.pose.pose.position.y != 0) &&
+         (last2_odom.pose.pose.position.z != 0) ){
+           std::cout << "do interpolation \n";
+           // do interpolation then update current lidar cloud
+           // gradient = dx/dt
+           // delta x = gradient * delta t
+           double deltat = 0.4*(curr.toNSec() - last_t.toNSec())/(last_t.toNSec() - last2_t.toNSec());
+           
+           double deltax = (last_odom.pose.pose.position.x - last2_odom.pose.pose.position.x) * deltat;
+           double deltay = (last_odom.pose.pose.position.y - last2_odom.pose.pose.position.y) * deltat;
+           double deltaz = (last_odom.pose.pose.position.z - last2_odom.pose.pose.position.z) * deltat;
+
+          tf::Vector3 tfv_ (deltax,deltay,deltaz);
+        
+          tf::Quaternion tfq_(last_odom.pose.pose.orientation.x,
+                                last_odom.pose.pose.orientation.y,
+                                last_odom.pose.pose.orientation.z,
+                                last_odom.pose.pose.orientation.w);
+          tf::Quaternion tfq_l(last2_odom.pose.pose.orientation.x,
+                                last2_odom.pose.pose.orientation.y,
+                                last2_odom.pose.pose.orientation.z,
+                                last2_odom.pose.pose.orientation.w);
+                                   
+          // compute slerp by hand
+          tf::Quaternion rot = tfq_l.inverse()*tfq_;
+          rot = tfq_.slerp(tfq_*rot,0.3);
+          //tfq_ = tfq_ * rot;
+
+          tf::Matrix3x3 m3temp(tfq_.inverse()*rot);
+          Eigen::Matrix< double, 4, 4 > mat4x4;
+          mat4x4 << m3temp[0][0] ,m3temp[0][1] ,m3temp[0][2] ,deltax ,
+                m3temp[1][0] ,m3temp[1][1] ,m3temp[1][2] ,deltay ,
+                m3temp[2][0] ,m3temp[2][1] ,m3temp[2][2] ,deltaz ,
+                0 ,0 ,0 ,1;       
+
+          // std::cout << tfq_[0] << "," << tfq_[1] << "," << tfq_[2] << "," << tfq_[3] <<"\n";
+          std::cout << mat4x4 <<"\n";
+
+          tf::Transform tftransform_ (tfq_, tfv_);
+
+          pcl::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2,mat4x4); 	
+          //pcl_ros::transformPointCloud(*lidar_cloud_tf,*lidar_cloud_tf2, tftransform_);
+          lidar_cloud_tf = lidar_cloud_tf2;
+          
+          // convert point cloud XYZ to point cloud 2
+          pcl::PCLPointCloud2::Ptr cloudFinal3 (new pcl::PCLPointCloud2 ());
+          pcl::toPCLPointCloud2 (*lidar_cloud_tf2,*cloudFinal3);      
+          cloudFinal3->header.frame_id = "velodyne";
+          // publish point cloud      
+          pcl_conversions::toPCL(ros::Time(0), cloudFinal3->header.stamp); //ros::Time::now()
+          pcl_inter_pub.publish(cloudFinal3);
+          
+      }
 
       // for first GPS data, do initial guesss of position
       if (first_guess == 1){
@@ -253,6 +323,7 @@ int main(int argc, char** argv){
       // from icp data publish to final result output
       // publish lidar_odom result
       nav_msgs::Odometry odom;
+      odom.header.stamp = ros::Time(0);
       odom.header.frame_id = "world";
       odom.child_frame_id = "base_link";
       odom.pose.pose.position.x = m4_new(0,3);
@@ -261,7 +332,7 @@ int main(int argc, char** argv){
       m3.setValue(m4_new(0,0) ,m4_new(0,1) ,m4_new(0,2) ,
                   m4_new(1,0) ,m4_new(1,1) ,m4_new(1,2) ,
                   m4_new(2,0) ,m4_new(2,1) ,m4_new(2,2));
-
+                                                                                                                                                                                                                                                                                                                                                                                                                 
       tf2::Quaternion tfq2;
       m3.getRotation(tfq2);
       odom.pose.pose.orientation.x = tfq2[0];
@@ -275,6 +346,10 @@ int main(int argc, char** argv){
                               0, 0, 0, 0, 0.05, 0,
                               0, 0, 0, 0, 0, 0.05
                             };
+      last2_odom = last_odom;
+      last_odom = odom;
+      last2_t = last_t;
+      last_t = curr;
       pcl_loc_pub.publish(odom);
       get_lidar = 0;
     }
