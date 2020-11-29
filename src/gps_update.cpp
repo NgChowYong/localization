@@ -24,9 +24,10 @@ void getGPSCallback(const geometry_msgs::PointStamped::ConstPtr& msg)
     gps_data = *msg;
     gps_data_cov.header = gps_data.header;
     gps_data_cov.pose.pose.position = gps_data.point;
-    gps_data_cov.pose.covariance = {10,0,0,0,0,0,
-                                    0,10,0,0,0,0,
-                                    0,0,10,0,0,0,
+    double uncertainty = 2.0;
+    gps_data_cov.pose.covariance = {uncertainty,0,0,0,0,0,
+                                    0,uncertainty,0,0,0,0,
+                                    0,0,uncertainty,0,0,0,
                                     0,0,0,0,0,0,
                                     0,0,0,0,0,0,
                                     0,0,0,0,0,0,};

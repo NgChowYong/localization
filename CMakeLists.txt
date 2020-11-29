@@ -210,9 +210,9 @@ include_directories(
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(lidar_process src/lidar.cpp)
-target_link_libraries(lidar_process ${catkin_LIBRARIES})
-add_dependencies(lidar_process icp_lidar_generate_messages_cpp)
+add_executable(new_lidar_process src/new_lidar.cpp)
+target_link_libraries(new_lidar_process ${catkin_LIBRARIES})
+add_dependencies(new_lidar_process icp_lidar_generate_messages_cpp)
 
 add_executable(gps_and_output src/gps_update.cpp)
 target_link_libraries(gps_and_output ${catkin_LIBRARIES})

@@ -1,0 +1,28 @@
+<launch>
+   
+    <param name="/use_sim_time" value="true"/>
+
+    <!-- dataset 3 -->
+    <rosparam param="file1">"/home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/map/nuscenes_maps/map_1700_1000.pcd"</rosparam>
+    <rosparam param="file2">"/home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/map/nuscenes_maps/map_1700_900.pcd"</rosparam>
+    <rosparam param="file3">"/home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/map/nuscenes_maps/map_1600_900.pcd"</rosparam>
+    <rosparam param="init_angle">2.5</rosparam>
+    <rosparam param="tf_lidar">"nuscenes_lidar"</rosparam>
+    <rosparam param="tf_car">"car"</rosparam>
+
+    <!-- start each ndoe -->
+    <node pkg="icp_lidar" type="gps_and_output" name="output" output="screen"/>
+    <node pkg="icp_lidar" type="new_lidar_process" name="lidar_icp" output="screen"/>
+
+    <!-- ekf node -->
+    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_se" clear_params="false">
+        <rosparam command="load" file="$(find icp_lidar)/launch/ekf_template.yaml" />
+        <remap from="odometry/filtered" to="odom"/>
+    </node>
+
+    <node type="rviz" name="rviz" pkg="rviz" args="-d /home/icmems/Desktop/SDC/hwk_localization_midterm/rviz_show.rviz" />
+
+    <arg name="node_delay" default = "25.0"/> 
+    <node pkg="rosbag" type="play" name="player" output="screen" args="-r 0.01 /home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/sdc_localization_3_lite.bag --clock " launch-prefix="bash -c 'sleep $(arg node_delay); $0 $@'"/>
+
+</launch>
