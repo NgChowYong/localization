@@ -20,9 +20,9 @@
         <remap from="odometry/filtered" to="odom"/>
     </node>
 
-    <node type="rviz" name="rviz" pkg="rviz" args="-d /home/icmems/Desktop/SDC/hwk_localization_midterm/rviz_show.rviz" />
+    <!--node type="rviz" name="rviz" pkg="rviz" args="-d /home/icmems/Desktop/SDC/hwk_localization_midterm/rviz_show.rviz" /-->
 
     <arg name="node_delay" default = "25.0"/> 
-    <node pkg="rosbag" type="play" name="player" output="screen" args="-r 0.01 /home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/sdc_localization_2_lite.bag --clock " launch-prefix="bash -c 'sleep $(arg node_delay); $0 $@'"/>
+    <!--node pkg="rosbag" type="play" name="player" output="screen" args="-r 0.01 /home/icmems/Desktop/SDC/hwk_localization_midterm/SDC_data/SDC_Data/sdc_localization_2_lite.bag --clock " launch-prefix="bash -c 'sleep $(arg node_delay); $0 $@'"/-->
 
 </launch>
