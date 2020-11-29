@@ -323,18 +323,17 @@ while (node.ok()){
       icp.setMaxCorrespondenceDistance (5); // unit in m
 
     }else{
-      if (get_odom == 1){
-        std::cout << "bef: " << m4(0,3) << "," << m4(1,3) << "\n";
-        if (difference_flag == 0){
-          m4 << m4(0,0) ,m4(0,1) ,m4(0,2) , gps_data.point.x,
-              m4(1,0) ,m4(1,1) ,m4(1,2) , gps_data.point.y,
-              m4(2,0) ,m4(2,1) ,m4(2,2) , gps_data.point.z,
-              0, 0, 0, 1;
-        }
-        std::cout << "aft: " << m4(0,3) << "," << m4(1,3) << "\n";
-        get_odom = 0;
+      std::cout << "bef: " << m4(0,3) << "," << m4(1,3) << "\n";
+      if (difference_flag == 0){
+        m4 << m4(0,0) ,m4(0,1) ,m4(0,2) , gps_data.point.x,
+            m4(1,0) ,m4(1,1) ,m4(1,2) , gps_data.point.y,
+            m4(2,0) ,m4(2,1) ,m4(2,2) , gps_data.point.z,
+            0, 0, 0, 1;
+        icp.setMaxCorrespondenceDistance (5); // unit in m
+      }else{
+        icp.setMaxCorrespondenceDistance (1.0); // unit in m // 1.1 for first
       }
-      icp.setMaxCorrespondenceDistance (1.0); // unit in m // 1.1 for first
+      std::cout << "aft: " << m4(0,3) << "," << m4(1,3) << "\n";
     }
 
     // Set the maximum number of iterations (criterion 1)
